@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cost Budget Builder — Spriggs Excavation</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0f1117;
+    --surface:   #181c27;
+    --surface2:  #1f2435;
+    --border:    #2a3045;
+    --border2:   #3a4460;
+    --accent:    #e8a430;
+    --accent2:   #f0c060;
+    --text:      #e8ecf4;
+    --text2:     #8a94b0;
+    --text3:     #5a6380;
+    --success:   #34c77b;
+    --danger:    #e8504a;
+    --warning:   #e8a430;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 32px;
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+  .topbar-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .topbar-logo .mark {
+    width: 28px;
+    height: 28px;
+    background: var(--accent);
+    clip-path: polygon(0 100%, 50% 0, 100% 100%);
+    flex-shrink: 0;
+  }
+  .topbar-logo span {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text2);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .topbar-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* ── MAIN ── */
+  .main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 560px;
+  }
+
+  .card-header {
+    margin-bottom: 32px;
+  }
+  .card-header h1 {
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .card-header h1 span {
+    color: var(--accent);
+  }
+  .card-header p {
+    font-size: 13px;
+    color: var(--text2);
+    font-weight: 300;
+  }
+
+  /* ── DROP ZONE ── */
+  .drop-zone {
+    position: relative;
+    border: 1.5px dashed var(--border2);
+    border-radius: 12px;
+    padding: 48px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .drop-zone::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 120%, rgba(232,164,48,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--surface2);
+  }
+  .drop-zone:hover::before, .drop-zone.drag-over::before {
+    background: radial-gradient(ellipse at 50% 120%, rgba(232,164,48,0.12) 0%, transparent 70%);
+  }
+  .drop-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+  .drop-icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .drop-icon svg {
+    width: 40px;
+    height: 40px;
+    stroke: var(--accent);
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+  .drop-zone:hover .drop-icon svg {
+    opacity: 1;
+  }
+  .drop-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .drop-sub {
+    font-size: 12px;
+    color: var(--text3);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* ── FILE CHIP ── */
+  .file-chip {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    margin-top: 12px;
+  }
+  .file-chip.show { display: flex; }
+  .file-chip svg { stroke: var(--success); flex-shrink: 0; }
+  .file-chip-name {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .file-chip-size {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    flex-shrink: 0;
+  }
+
+  /* ── PROGRESS ── */
+  .progress-bar {
+    display: none;
+    margin-top: 16px;
+    height: 2px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-bar.show { display: block; }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.4s ease;
+    animation: progress-shimmer 1.2s ease infinite;
+  }
+  @keyframes progress-shimmer {
+    0%   { opacity: 1; }
+    50%  { opacity: 0.6; }
+    100% { opacity: 1; }
+  }
+  .progress-label {
+    display: none;
+    margin-top: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    letter-spacing: 0.05em;
+  }
+  .progress-label.show { display: block; }
+
+  /* ── RESULT ── */
+  .result {
+    display: none;
+    margin-top: 20px;
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .result.show { display: block; }
+
+  .result-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .result-header svg { stroke: var(--success); flex-shrink: 0; }
+  .result-header-text {
+    font-weight: 500;
+    font-size: 14px;
+    color: var(--text);
+  }
+
+  .result-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-bottom: 1px solid var(--border);
+  }
+  .stat {
+    padding: 16px 20px;
+    border-right: 1px solid var(--border);
+  }
+  .stat:last-child { border-right: none; }
+  .stat-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 4px;
+  }
+  .stat-value {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--accent2);
+    letter-spacing: -0.02em;
+  }
+
+  .result-download {
+    padding: 16px 20px;
+  }
+  .result-download p {
+    font-size: 12px;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+  .download-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: var(--accent);
+    color: #000;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: background 0.15s, transform 0.1s;
+    cursor: pointer;
+  }
+  .download-btn:hover {
+    background: var(--accent2);
+    transform: translateY(-1px);
+  }
+  .download-btn:active {
+    transform: translateY(0);
+  }
+  .download-btn svg {
+    stroke: #000;
+    flex-shrink: 0;
+  }
+  .download-filename {
+    display: block;
+    margin-top: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+  }
+
+  /* ── ERROR ── */
+  .error-box {
+    display: none;
+    margin-top: 12px;
+    padding: 12px 16px;
+    background: rgba(232,80,74,0.1);
+    border: 1px solid rgba(232,80,74,0.3);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--danger);
+    display: none;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .error-box.show { display: flex; }
+  .error-box svg { stroke: var(--danger); flex-shrink: 0; margin-top: 1px; }
+
+  /* ── FOOTER ── */
+  footer {
+    padding: 20px 32px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  footer span {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    letter-spacing: 0.05em;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-logo">
+    <div class="mark"></div>
+    <span>Spriggs Excavation</span>
+  </div>
+  <div class="topbar-title">Internal Tools</div>
+</div>
+
+<main class="main">
+  <div class="card">
+    <div class="card-header">
+      <h1>Cost Budget <span>Builder</span></h1>
+      <p>Upload a cost-coded bid workbook and download the Acumatica import file.</p>
+    </div>
+
+    <div class="drop-zone" id="dropZone" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+      <input type="file" accept=".xlsx" id="fileInput" onchange="handleFile(this.files[0])">
+      <div class="drop-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/>
+          <polyline points="9 15 12 12 15 15"/>
+        </svg>
+      </div>
+      <div class="drop-title">Drop coded bid workbook here</div>
+      <div class="drop-sub">.xlsx only &nbsp;·&nbsp; must contain a Summary tab</div>
+    </div>
+
+    <div class="file-chip" id="fileChip">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+      <span class="file-chip-name" id="chipName"></span>
+      <span class="file-chip-size" id="chipSize"></span>
+    </div>
+
+    <div class="progress-bar" id="progressBar">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+    <div class="progress-label" id="progressLabel"></div>
+
+    <div class="result" id="result">
+      <div class="result-header">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+        <span class="result-header-text">Budget built</span>
+      </div>
+      <div class="result-stats">
+        <div class="stat">
+          <div class="stat-label">Budget rows</div>
+          <div class="stat-value" id="statRows">—</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Total budget</div>
+          <div class="stat-value" id="statTotal">—</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Material rows</div>
+          <div class="stat-value" id="statMat">—</div>
+        </div>
+      </div>
+      <div class="result-download">
+        <p>Right-click → Save link as if clicking doesn't download automatically.</p>
+        <a class="download-btn" id="downloadBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Download cost budget
+        </a>
+        <span class="download-filename" id="downloadFilename"></span>
+      </div>
+    </div>
+
+    <div class="error-box" id="errorBox">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      <span id="errorText"></span>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <span>Cost Budget Builder v1.0</span>
+  <span>South Park BESS — reference job</span>
+</footer>
+
+<script>
+// ── DRAG & DROP ──────────────────────────────────────────────────────────────
+function onDragOver(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.add('drag-over');
+}
+function onDragLeave(e) {
+  document.getElementById('dropZone').classList.remove('drag-over');
+}
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+}
+
+// ── UI HELPERS ───────────────────────────────────────────────────────────────
+function showProgress(msg, pct) {
+  const bar = document.getElementById('progressBar');
+  const fill = document.getElementById('progressFill');
+  const label = document.getElementById('progressLabel');
+  bar.classList.add('show');
+  label.classList.add('show');
+  fill.style.width = (pct || 30) + '%';
+  label.textContent = msg;
+}
+function hideProgress() {
+  document.getElementById('progressBar').classList.remove('show');
+  document.getElementById('progressLabel').classList.remove('show');
+}
+function showError(msg) {
+  hideProgress();
+  const box = document.getElementById('errorBox');
+  box.classList.add('show');
+  document.getElementById('errorText').textContent = msg;
+  document.getElementById('result').classList.remove('show');
+}
+function hideError() {
+  document.getElementById('errorBox').classList.remove('show');
+}
+
+// ── FILE HANDLER ─────────────────────────────────────────────────────────────
+function handleFile(file) {
+  if (!file || !file.name.endsWith('.xlsx')) {
+    showError('Please upload an .xlsx file.');
+    return;
+  }
+  hideError();
+  document.getElementById('result').classList.remove('show');
+
+  const chip = document.getElementById('fileChip');
+  chip.classList.add('show');
+  document.getElementById('chipName').textContent = file.name;
+  document.getElementById('chipSize').textContent = (file.size / 1024).toFixed(0) + ' KB';
+
+  showProgress('Reading workbook…', 20);
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      if (!wb.SheetNames.includes('Summary')) {
+        showError('No "Summary" tab found. Make sure you\'re uploading the coded bid workbook.');
+        return;
+      }
+      showProgress('Extracting budget rows…', 55);
+      setTimeout(function() {
+        try {
+          const result = buildBudget(wb);
+          showProgress('Writing output file…', 85);
+          setTimeout(function() {
+            showResult(result, file.name);
+          }, 80);
+        } catch(err) {
+          showError('Error processing workbook: ' + err.message);
+        }
+      }, 60);
+    } catch(err) {
+      showError('Could not read file: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function showResult(result, srcName) {
+  hideProgress();
+  document.getElementById('statRows').textContent = result.budgetRows.toLocaleString();
+  document.getElementById('statTotal').textContent = '$' + Math.round(result.totalAmt / 1000).toLocaleString() + 'k';
+  document.getElementById('statMat').textContent = result.matRows;
+
+  const outName = srcName.replace(/\.xlsx$/i, '') + '_Cost_Budget.xlsx';
+  const b64 = XLSX.write(result.wb, { bookType: 'xlsx', type: 'base64' });
+  const btn = document.getElementById('downloadBtn');
+  btn.href = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + b64;
+  btn.download = outName;
+  document.getElementById('downloadFilename').textContent = outName;
+  document.getElementById('result').classList.add('show');
+}
+
+// ── BUDGET LOGIC (identical to validated widget) ──────────────────────────────
+const GRP_ORDER = { LABOR:0, TRUCKING:1, EQUIP:2, MATERIAL:3, SUBCON:4, WATER:5, FUEL:6, RETAINAGE:7 };
+function codeNum(c) { return parseInt(String(c).replace(/[-,\s]/g,''), 10) || 0; }
+function sortRows(rows) {
+  return rows.slice().sort(function(a,b) {
+    const ca = codeNum(a[0]), cb = codeNum(b[0]);
+    if (ca !== cb) return ca - cb;
+    return (GRP_ORDER[a[1]] || 99) - (GRP_ORDER[b[1]] || 99);
+  });
+}
+
+const MATERIAL_IN_BLOCKS = new Set(['60001','60002','60003','60004','60005','60006','20008','20001','40302','41003','51000','20500','40100','40101']);
+const MATERIAL_USE_COL11 = new Set(['60601','21500','18206']);
+const SUBS_TO_MATERIAL   = new Set(['12000','20001']);
+const PLACEHOLDERS = [
+  ['90-000','LABOR'],['90-000','EQUIP'],['90-000','MATERIAL'],
+  ['90-001','LABOR'],['90-001','EQUIP'],['90-001','MATERIAL'],
+  ['90-002','LABOR'],['90-002','EQUIP'],['90-002','MATERIAL'],
+  ['90-003','MATERIAL'],['90-004','MATERIAL'],
+  ['90-100','EQUIP'],['90-101','EQUIP'],['90-500','EQUIP'],
+];
+const AGG_LABELS = new Set(['AGGREGATE','AGGREGATE COST','AGGREGATE SUMMARY','GRAVEL SUMMARY']);
+const MAT_LABELS = new Set(['MATERIALS','MATERIALS COST','OTHER MATERIALS','MATERIAL COST']);
+
+function fmtCode(r) { const s=String(r).trim().replace(/[,\- ]/g,''); return s.length>=3?s.slice(0,2)+'-'+s.slice(2):s; }
+function nk(r) { return String(r).trim().replace(/[-,\s]/g,''); }
+function sf(v) { try { return parseFloat(String(v).replace(/'/g,''))||0; } catch(e) { return 0; } }
+function validCode(r) {
+  if (!r) return false;
+  const s = String(r).trim();
+  if (['Not doing','ALL MATERIAL COST',''].includes(s)) return false;
+  return /^\d+$/.test(s.replace(/[-,\s]/g,''));
+}
+function cv(ws,r,c) { const a=XLSX.utils.encode_cell({r:r-1,c:c-1}); return ws[a]?ws[a].v:null; }
+
+function detectCols(ws) {
+  const cols={labor:13,trucking:14,equip:15,materials:16,subs:17,water:18};
+  const found={};
+  for (let c=1;c<=28;c++) {
+    const v=String(cv(ws,5,c)||'').trim();
+    if (v==='Labor'&&!found.labor)      { found.labor=1;     cols.labor=c; }
+    if ((v==='Trucking'||v==='Trucking ')&&!found.trucking) { found.trucking=1; cols.trucking=c; }
+    if (v==='Equipment'&&!found.equip)  { found.equip=1;     cols.equip=c; }
+    if (v==='Materials'&&!found.materials){ found.materials=1; cols.materials=c; }
+    if (v==='Subs'&&!found.subs)        { found.subs=1;      cols.subs=c; }
+    if (v==='Water'&&!found.water)      { found.water=1;     cols.water=c; }
+  }
+  return cols;
+}
+
+function findDataEnd(ws,lc) {
+  for (let r=10;r<170;r++) {
+    const desc=String(cv(ws,r,4)||'').toLowerCase();
+    const item=String(cv(ws,r,3)||'').trim();
+    if (desc.includes('hourly rate')||desc.includes('material unit rate')) return r;
+    if (item.toLowerCase().includes('add alternate')) return r;
+    if (!item&&!cv(ws,r,2)&&sf(cv(ws,r,lc))>100000) return r;
+  }
+  return 160;
+}
+
+function extractLineItems(ws) {
+  const cols=detectCols(ws), end=findDataEnd(ws,cols.labor), acc={};
+  let cc=null,cnk=null,cd=null,cq=null,cu=null;
+  for (let r=6;r<end;r++) {
+    const b=cv(ws,r,2),c=String(cv(ws,r,3)||'').trim(),d=cv(ws,r,4),e=cv(ws,r,5),f=cv(ws,r,6),g=cv(ws,r,7);
+    if (!c&&!b) continue;
+    const rhc=validCode(b);
+    if (c&&!rhc&&b&&String(b).trim()!=='') { cc=null; cnk=null; }
+    if (rhc) { cc=fmtCode(String(b)); cnk=nk(String(b)); cd=String(d||'').trim(); cq=e; cu=f; }
+    if (!cc) continue;
+    const ac=rhc?fmtCode(String(b)):cc, ank=rhc?nk(String(b)):cnk;
+    const ad=rhc?String(d||'').trim():cd, aq=rhc?e:cq, au=rhc?f:cu;
+    const matV=MATERIAL_IN_BLOCKS.has(ank)?0:MATERIAL_USE_COL11.has(ank)?sf(cv(ws,r,11)):sf(cv(ws,r,cols.materials));
+    const sv=sf(cv(ws,r,cols.subs));
+    const srcs=[['LABOR',sf(cv(ws,r,cols.labor)),sf(g)],['TRUCKING',sf(cv(ws,r,cols.trucking)),0],
+      ['EQUIP',sf(cv(ws,r,cols.equip)),0],['MATERIAL',matV,0],
+      ['MATL_S',SUBS_TO_MATERIAL.has(ank)?sv:0,0],['SUBCON',SUBS_TO_MATERIAL.has(ank)?0:sv,0],
+      ['WATER',sf(cv(ws,r,cols.water)),0]];
+    for (const [grp,v,h] of srcs) {
+      if (!v) continue;
+      const k=ac+'||'+grp;
+      if (!acc[k]) acc[k]={code:ac,grp,desc:ad,qty:aq,uom:au,amt:0,hrs:0};
+      acc[k].amt+=v; acc[k].hrs+=h;
+    }
+  }
+  const rows=[];
+  for (const k of Object.keys(acc)) {
+    const d=acc[k],amt=Math.round(d.amt*100)/100,qs=d.qty?sf(d.qty)||1:1,us=d.uom?String(d.uom).trim():'LS';
+    const grp=d.grp==='MATL_S'?'MATERIAL':d.grp;
+    if (grp==='LABOR')    { const h=Math.round(d.hrs); rows.push([d.code,'LABOR',d.desc,h,'HOUR',h?amt/h:0,amt]); }
+    else if (grp==='TRUCKING') rows.push([d.code,'TRUCKING',d.desc,1,'LS',amt,amt]);
+    else if (grp==='EQUIP')    rows.push([d.code,'EQUIP',d.desc,1,'LS',amt,amt]);
+    else if (grp==='MATERIAL') rows.push([d.code,'MATERIAL',d.desc,qs,us,qs?amt/qs:amt,amt]);
+    else if (grp==='SUBCON')   rows.push([d.code,'SUBCON',d.desc,qs,us,qs?amt/qs:amt,amt]);
+    else if (grp==='WATER')    rows.push([d.code,'WATER',d.desc,qs,us,qs?amt/qs:amt,amt]);
+  }
+  return rows;
+}
+
+function detectBlockCols(ws,headerRow,anchorCol) {
+  const cols={code:anchorCol,desc:anchorCol+1,qty:anchorCol+2,uom:anchorCol+3,rate:anchorCol+4,amt:anchorCol+5,amtAlt:-1};
+  const startCol=Math.max(1,anchorCol-1);
+  for (let c=startCol;c<=anchorCol+8;c++) {
+    const v=String(cv(ws,headerRow,c)||'').trim().toLowerCase();
+    if (v==='cost code'||v==='code') cols.code=c;
+    if (v.includes('description')||v.includes('aggregate type')||v.includes('material type')) cols.desc=c;
+    if (v==='qty'||v==='quantity'||v==='tons') cols.qty=c;
+    if (v==='unit'||v==='uom') cols.uom=c;
+    if (v.includes('unit cost')||v.includes('unit price')||v.includes('unit rate')) cols.rate=c;
+    if (v==='price'||v.includes('total cost')||v.includes('cost - bid')||v.includes('(bid)')||v==='total (bid)') cols.amt=c;
+    if (v.includes('formula')||v.includes('cost - formula')||v==='total (formula)') cols.amtAlt=c;
+    if (v==='total'&&cols.amt===anchorCol+5) cols.amt=c;
+  }
+  return cols;
+}
+
+function pickAmt(aBid,aFml) {
+  if (aBid>0&&aFml>0) return Math.abs(aFml-aBid)/aBid>0.001?aBid:aFml;
+  return aBid||aFml;
+}
+
+function blockHasValidCodes(ws,headerRow,anchorCol) {
+  const bc=detectBlockCols(ws,headerRow,anchorCol);
+  for (let r=headerRow+1;r<headerRow+15;r++) {
+    const v=cv(ws,r,bc.code);
+    if (v&&validCode(v)) return true;
+    if (!cv(ws,r,bc.code)&&!cv(ws,r,bc.desc)) break;
+  }
+  return false;
+}
+
+function extractMaterialBlocks(ws) {
+  const aggBlocks=[], matBlocks=[];
+  for (let r=100;r<250;r++) {
+    for (let c=1;c<=20;c++) {
+      const raw=cv(ws,r,c); if (!raw) continue;
+      const v=String(raw).trim().toUpperCase();
+      if (AGG_LABELS.has(v)) { if (blockHasValidCodes(ws,r+1,c)) aggBlocks.push({labelRow:r,anchorCol:c}); break; }
+      if (MAT_LABELS.has(v)) { if (blockHasValidCodes(ws,r+1,c)) matBlocks.push({labelRow:r,anchorCol:c}); break; }
+    }
+  }
+  function readBlock(labelRow,anchorCol) {
+    const headerRow=labelRow+1, bc=detectBlockCols(ws,headerRow,anchorCol);
+    const seen=new Set(), rows=[]; let emp=0;
+    for (let r=headerRow+1;r<headerRow+70;r++) {
+      const g0=cv(ws,r,bc.code), g1=cv(ws,r,bc.desc);
+      if (!g0&&!g1) { if (++emp>=2) break; continue; }
+      emp=0; if (!g0) continue;
+      const cs=String(g0).trim();
+      if (!cs||!/^\d/.test(cs)||!validCode(cs)) continue;
+      const ck=fmtCode(cs); if (seen.has(ck)) continue; seen.add(ck);
+      const qty=sf(cv(ws,r,bc.qty)), uomRaw=cv(ws,r,bc.uom), rate=sf(cv(ws,r,bc.rate));
+      const aBid=sf(cv(ws,r,bc.amt)), aFml=bc.amtAlt>0?sf(cv(ws,r,bc.amtAlt)):0;
+      const amt=pickAmt(aBid,aFml); if (!amt) continue;
+      rows.push([ck,'MATERIAL',String(g1||'').trim(),qty,uomRaw?String(uomRaw).trim():'EA',rate,Math.round(amt*100)/100]);
+    }
+    return rows;
+  }
+  const seenCodes=new Set(), rows=[];
+  for (const b of aggBlocks) for (const row of readBlock(b.labelRow,b.anchorCol)) { if (!seenCodes.has(row[0])) { seenCodes.add(row[0]); rows.push(row); } }
+  for (const b of matBlocks)  for (const row of readBlock(b.labelRow,b.anchorCol)) { if (!seenCodes.has(row[0])) { seenCodes.add(row[0]); rows.push(row); } }
+  return rows;
+}
+
+function buildBudget(wb) {
+  const ws=wb.Sheets['Summary'];
+  const lineRows=extractLineItems(ws), matRows=extractMaterialBlocks(ws);
+  const allRows=sortRows([...lineRows,...matRows]);
+  const headers=['Project Task','Cost Code','Account Group','Description','Original Budgeted Quantity','UOM','Unit Rate','Original Budgeted Amount','Revised Budgeted Quantity','Revised Budgeted Amount'];
+  const sheetData=[headers]; let totalAmt=0;
+  for (const [code,grp,desc,qty,uom,rate,amt] of allRows) {
+    const q=typeof qty==='number'?Math.round(qty*1000)/1000:qty;
+    sheetData.push(['DEFAULT',code,grp,desc,q,uom,Math.round((rate||0)*10000)/10000,Math.round(amt*100)/100,q,Math.round(amt*100)/100]);
+    totalAmt+=amt;
+  }
+  for (const [code,grp] of PLACEHOLDERS) sheetData.push(['DEFAULT',code,grp,'',0,'',0,0,0,0]);
+  const outWb=XLSX.utils.book_new();
+  const ws2=XLSX.utils.aoa_to_sheet(sheetData);
+  ws2['!cols']=[10,12,12,40,12,8,12,16,12,16].map(function(w){return{wch:w};});
+  XLSX.utils.book_append_sheet(outWb,ws2,'Projects');
+  return { wb:outWb, budgetRows:allRows.length, totalAmt, matRows:matRows.length };
+}
+</script>
+</body>
+</html>
